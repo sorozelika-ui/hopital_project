@@ -1,0 +1,71 @@
+
+services:
+  # Backend Laravel
+  backend:
+    build:
+      context: ./back_hopital
+      dockerfile: Dockerfile
+    container_name: hopital_backend
+    env_file:
+      - ./back_hopital/.env
+    ports:
+      - "8000:80"
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      DB_CONNECTION: pgsql
+      DB_HOST: database
+      DB_PORT: "5432"
+      DB_DATABASE: ${POSTGRES_DB}
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - hopital_network
+
+  # Frontend React
+  frontend:
+    build:
+      context: ./front_hopital
+      dockerfile: Dockerfile
+    container_name: hopital_frontend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: "http://localhost:8000/api"
+    depends_on:
+      - backend
+    networks:
+      - hopital_network
+
+  # Base de données PostgreSQL
+  database:
+    image: postgres:16-alpine
+    container_name: hopital_database
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hopital_network
+
+# Volumes persistants
+volumes:
+  postgres_data:
+
+# Réseau commun
+networks:
+  hopital_network:
+    driver: bridge
